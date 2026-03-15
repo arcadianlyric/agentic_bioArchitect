@@ -1,9 +1,9 @@
 
-## 16S rRNA 架构
+## UMI 16S rRNA 架构
 
 本项目包含两个模块：
-1. multi_agent：通用多代理 LLM 规划器，用于自动化工作流架构设计和代码生成
-2. 16s_rRNA_workflow：由 multi_agent 模块设计的实际生物信息学流水线实现（Snakemake 工作流 + Python 脚本）
+1. multi_agent_architecturer LLM 规划器，用于自动化工作流架构设计和代码生成
+2. 16s_rRNA_workflow：由 architecturer 模块设计的实际生物信息学流水线实现（Snakemake 工作流 + Python 脚本）
 
 ## 1. 将 multi_agent 架构应用于 UMI 16S rRNA
 
