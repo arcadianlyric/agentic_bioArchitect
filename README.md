@@ -1,115 +1,20 @@
-## 16S rRNA Pipeline ./src
-
-A legacy 16S rRNA microbial diversity sequencing analysis project supporting three analysis methods. This core pipeline provides the foundation for the multi-agent extension in `./multi_agent`.
-
-### Results and Impact
-
-The pipeline enables microbial community profiling through three complementary approaches:
-
-1. **Meta De Novo** -- Metagenome assembly using MetaSPAdes for species annotation via Kraken
-2. **Align to Ref** -- Reference-based alignment against ZymoBIOMICS 16S standard community for species identification
-3. **Frag De Novo** (core method) -- Fragment-based assembly leveraging stLFR co-barcodes
-
-The Frag De Novo method is particularly powerful for stLFR (Single Tube Long Fragment read) data, where each DNA fragment carries a unique barcode. By grouping reads by barcode, the pipeline performs per-fragment assembly, enabling:
-- Pseudo-long-read assembly from short reads
-- Fragment-level coverage analysis
-- Strain-resolved assembly for complex communities
-
-### Materials and Methods
-
-#### Input and Output
-
-| Component | Description |
-|-----------|-------------|
-| Input | Paired-end FASTQ from `data/split_read.{1,2}.fq.gz` (via splitreads.smk) |
-| Barcode source | stLFR co-barcodes in BAM file (BX:Z: tag) |
-| Output (general) | QUAST assembly quality reports |
-| Output (ZymoBIOMICS) | Abundance statistics comparing observed vs theoretical composition |
-
-#### Analysis Workflow
-
-**Method 1: Meta De Novo**
-```
-FASTQ → Kraken (taxonomy) → MetaSPAdes (assembly) → QUAST (evaluation)
-```
-
-**Method 2: Align to Ref**
-```
-FASTQ → BWA mem → SAMtools sort → idxstats → abundance calculation
-Reference: ZymoBIOMICS 16S standard (8 bacterial species)
-```
-
-**Method 3: Frag De Novo** (main method)
-```
-BAM → group by BX:Z:barcode → filter 200-1000 reads/barcode →
-bc2fq.py (extract FASTQ) → SPAdes (per-barcode assembly) →
-merge contigs → QUAST + coverage analysis
-```
-
-#### Key Functions (rna_16s.py)
-
-| Function | Purpose |
-|----------|---------|
-| `pct_denovoFrag_ref()` | Calculate fragment coverage vs 16S reference length |
-| `coverage_bias()` | Visualize fragment coverage distribution on 16S reference |
-| `per_base_density()` | Generate per-base coverage density plots |
-| `merge_exon_ref()` | Merge multiple contigs into single sequence |
-
-#### Tools and Algorithms
-
-| Component | Tool | Rationale |
-|-----------|------|-----------|
-| Assembler | [SPAdes](https://github.com/ablab/spades) | Versatile assembler supporting multiple modes (meta, rna, plasmid) |
-| Alignment | [BWA](http://bio-bwa.sourceforge.net/) | Fast short-read aligner for reference mapping |
-| Taxonomy | [Kraken](https://ccb.jhu.edu/software/kraken/) | k-mer based taxonomic classification |
-| Assembly QC | [QUAST](https://quast.sourceforge.net/) | Comprehensive assembly quality metrics |
-| Reference | ZymoBIOMICS 16S | Standard mock community (8 species) with known composition |
-
-#### ZymoBIOMICS Standard Species
-
-| Species | 16S Length (bp) |
-|---------|-----------------|
-| Bacillus subtilis | 1558 |
-| Enterococcus faecalis | 1562 |
-| Escherichia coli | 1542 |
-| Lactobacillus fermentum | 1568-1578 |
-| Listeria monocytogenes | 1552 |
-| Pseudomonas aeruginosa | 1526 |
-| Salmonella enterica | 1534 |
-| Staphylococcus aureus | 1556 |
-
-#### Frag De Novo Algorithm
-
-1. **Barcode grouping** -- Extract reads from BAM by BX:Z: barcode
-2. **Quality filtering** -- Select barcodes with 200-1000 reads (avoid low-coverage or PCR duplicates)
-3. **Per-barcode assembly** -- Run SPAdes on each barcode's reads
-4. **Contig selection** -- Keep longest contig per barcode (contigs_max.fasta)
-5. **Reference alignment** -- Align contigs to ZymoBIOMICS 16S reference via minimap2
-6. **Coverage calculation** -- For each fragment, compute: `frag_length / ref_16S_length`
-7. **Abundance estimation** -- Compare observed coverage to theoretical Zymo composition
-
-### Discussion
-
-**Strengths:**
-- Fragment-level assembly preserves long-range information lost in standard 16S amplicon sequencing
-- Per-barcode assembly enables strain-resolved analysis in complex communities
-- ZymoBIOMICS integration provides ground truth for benchmarking
-
-**Limitations:**
-- Requires stLFR data with co-barcodes (not standard 16S FASTQ)
-- Assembly quality depends on per-barcode read depth
-- No UMI deduplication (PCR bias correction)
-
-**To-Do:**
-- Integrate UMI deduplication for improved abundance accuracy
-- Add DADA2-style denoising for ASV-level resolution
-- Benchmark against mock community ground truth
-
----
-
-## UMI 16S rRNA Multi-Agent Pipeline ./multi_agent
+## UMI 16S rRNA Project Architecturer ./multi_agent
 
 Automated workflow design and code generation for UMI-based 16S rRNA metatranscriptomic abundance analysis, powered by a multi-agent LLM system with CrewAI orchestration and direct API tool integration.
+
+### Project Structure
+
+This project consists of two main components:
+
+1. **`./multi_agent`** -- Multi-agent LLM system for automated workflow architecture design and code generation
+2. **`./16s_rRNA_workflow`** -- The actual bioinformatics pipeline implementation (Snakemake workflow + Python scripts)
+
+**Workflow:**
+```
+Task Description → multi_agent (Phase 1: Architecture) → Human Review → multi_agent (Phase 2: Coding) → 16s_rRNA_workflow (Pipeline Execution)
+```
+
+The multi-agent module first designs the complete bioinformatics workflow (tools, parameters, steps), then generates the implementation code. The 16s_rRNA_workflow directory contains the actual pipeline that executes this design.
 
 ### Background
 
@@ -368,6 +273,116 @@ This project's workflow is inherently sequential and role-structured (research -
 - [ ] Parallel Researcher sub-agents (Swarm-style) for multi-database search
 
 ---
+
+## 16S rRNA Pipeline ./src
+
+A legacy 16S rRNA microbial diversity sequencing analysis project supporting three analysis methods. This core pipeline provides the foundation for the multi-agent extension in `./multi_agent`.
+
+### Results and Impact
+
+The pipeline enables microbial community profiling through three complementary approaches:
+
+1. **Meta De Novo** -- Metagenome assembly using MetaSPAdes for species annotation via Kraken
+2. **Align to Ref** -- Reference-based alignment against ZymoBIOMICS 16S standard community for species identification
+3. **Frag De Novo** (core method) -- Fragment-based assembly leveraging stLFR co-barcodes
+
+The Frag De Novo method is particularly powerful for stLFR (Single Tube Long Fragment read) data, where each DNA fragment carries a unique barcode. By grouping reads by barcode, the pipeline performs per-fragment assembly, enabling:
+- Pseudo-long-read assembly from short reads
+- Fragment-level coverage analysis
+- Strain-resolved assembly for complex communities
+
+### Materials and Methods
+
+#### Input and Output
+
+| Component | Description |
+|-----------|-------------|
+| Input | Paired-end FASTQ from `data/split_read.{1,2}.fq.gz` (via splitreads.smk) |
+| Barcode source | stLFR co-barcodes in BAM file (BX:Z: tag) |
+| Output (general) | QUAST assembly quality reports |
+| Output (ZymoBIOMICS) | Abundance statistics comparing observed vs theoretical composition |
+
+#### Analysis Workflow
+
+**Method 1: Meta De Novo**
+```
+FASTQ → Kraken (taxonomy) → MetaSPAdes (assembly) → QUAST (evaluation)
+```
+
+**Method 2: Align to Ref**
+```
+FASTQ → BWA mem → SAMtools sort → idxstats → abundance calculation
+Reference: ZymoBIOMICS 16S standard (8 bacterial species)
+```
+
+**Method 3: Frag De Novo** (main method)
+```
+BAM → group by BX:Z:barcode → filter 200-1000 reads/barcode →
+bc2fq.py (extract FASTQ) → SPAdes (per-barcode assembly) →
+merge contigs → QUAST + coverage analysis
+```
+
+#### Key Functions (rna_16s.py)
+
+| Function | Purpose |
+|----------|---------|
+| `pct_denovoFrag_ref()` | Calculate fragment coverage vs 16S reference length |
+| `coverage_bias()` | Visualize fragment coverage distribution on 16S reference |
+| `per_base_density()` | Generate per-base coverage density plots |
+| `merge_exon_ref()` | Merge multiple contigs into single sequence |
+
+#### Tools and Algorithms
+
+| Component | Tool | Rationale |
+|-----------|------|-----------|
+| Assembler | [SPAdes](https://github.com/ablab/spades) | Versatile assembler supporting multiple modes (meta, rna, plasmid) |
+| Alignment | [BWA](http://bio-bwa.sourceforge.net/) | Fast short-read aligner for reference mapping |
+| Taxonomy | [Kraken](https://ccb.jhu.edu/software/kraken/) | k-mer based taxonomic classification |
+| Assembly QC | [QUAST](https://quast.sourceforge.net/) | Comprehensive assembly quality metrics |
+| Reference | ZymoBIOMICS 16S | Standard mock community (8 species) with known composition |
+
+#### ZymoBIOMICS Standard Species
+
+| Species | 16S Length (bp) |
+|---------|-----------------|
+| Bacillus subtilis | 1558 |
+| Enterococcus faecalis | 1562 |
+| Escherichia coli | 1542 |
+| Lactobacillus fermentum | 1568-1578 |
+| Listeria monocytogenes | 1552 |
+| Pseudomonas aeruginosa | 1526 |
+| Salmonella enterica | 1534 |
+| Staphylococcus aureus | 1556 |
+
+#### Frag De Novo Algorithm
+
+1. **Barcode grouping** -- Extract reads from BAM by BX:Z: barcode
+2. **Quality filtering** -- Select barcodes with 200-1000 reads (avoid low-coverage or PCR duplicates)
+3. **Per-barcode assembly** -- Run SPAdes on each barcode's reads
+4. **Contig selection** -- Keep longest contig per barcode (contigs_max.fasta)
+5. **Reference alignment** -- Align contigs to ZymoBIOMICS 16S reference via minimap2
+6. **Coverage calculation** -- For each fragment, compute: `frag_length / ref_16S_length`
+7. **Abundance estimation** -- Compare observed coverage to theoretical Zymo composition
+
+### Discussion
+
+**Strengths:**
+- Fragment-level assembly preserves long-range information lost in standard 16S amplicon sequencing
+- Per-barcode assembly enables strain-resolved analysis in complex communities
+- ZymoBIOMICS integration provides ground truth for benchmarking
+
+**Limitations:**
+- Requires stLFR data with co-barcodes (not standard 16S FASTQ)
+- Assembly quality depends on per-barcode read depth
+- No UMI deduplication (PCR bias correction)
+
+**To-Do:**
+- Integrate UMI deduplication for improved abundance accuracy
+- Add DADA2-style denoising for ASV-level resolution
+- Benchmark against mock community ground truth
+
+---
+
 
 ### References
 
