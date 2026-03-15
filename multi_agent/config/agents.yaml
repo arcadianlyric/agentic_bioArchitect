@@ -1,0 +1,105 @@
+# Agent configuration for UMI 16S rRNA multi-agent pipeline
+# Each agent can use a different LLM provider/model
+
+llm_defaults:
+  provider: "openai"          # xai (Grok), deepseek, openai, google
+  model: "gpt-4o"
+  temperature: 0.3
+  max_tokens: 4000
+
+# Phase 1: Architecture module
+architecture_crew:
+  researcher:
+    role: "Bioinformatics Researcher"
+    goal: >
+      Find relevant tools, recent papers (2023-2026), and benchmarks on UMI-based
+      deduplication and clustering for 16S rRNA metatranscriptomics abundance analysis.
+    backstory: >
+      Expert in bioinformatics literature search with deep knowledge of NGS sequencing,
+      UMI deduplication, 16S rRNA amplicon analysis, and metatranscriptomic workflows.
+      You prioritize peer-reviewed publications and well-maintained open-source tools.
+    llm:
+      provider: "openai"
+      model: "gpt-4o"
+    tools: ["tavily_search", "pubmed_search"]
+
+  analyst:
+    role: "Pipeline Architect"
+    goal: >
+      Design a step-by-step bioinformatics workflow for UMI-based 16S rRNA
+      metatranscriptomic abundance analysis, based on Researcher findings.
+    backstory: >
+      Senior bioinformatics pipeline designer. You translate tool/paper findings into
+      concrete, reproducible workflows with clear input/output specifications,
+      tool selection rationale, and parameter recommendations.
+    llm:
+      provider: "openai"
+      model: "gpt-4o"
+    tools: []
+
+  reviewer:
+    role: "Architecture Reviewer"
+    goal: >
+      Critically evaluate the proposed workflow for scientific rigor, tool compatibility,
+      edge cases, and reproducibility. Suggest concrete improvements.
+    backstory: >
+      Staff scientist with expertise in benchmarking bioinformatics pipelines.
+      You focus on identifying gaps, potential failure modes, and ensuring the workflow
+      handles real-world data (low-quality reads, chimeras, uneven coverage).
+    llm:
+      provider: "openai"
+      model: "gpt-4o"
+    tools: ["tavily_search"]
+
+# Phase 2: Coding module (runs after human review of architecture)
+coding_crew:
+  coder:
+    role: "Bioinformatics Developer"
+    goal: >
+      Implement the approved workflow as production-quality Python code.
+      Use UMI-tools, biopython, and standard bioinformatics libraries.
+    backstory: >
+      Python developer specializing in bioinformatics pipelines. You write clean,
+      well-documented, testable code with proper error handling and logging.
+      You follow the existing project conventions in rna_16s.smk.
+    llm:
+      provider: "openai"
+      model: "gpt-4o"
+    tools: ["code_execution"]
+
+  code_reviewer:
+    role: "Code Reviewer"
+    goal: >
+      Review generated code for correctness, edge cases, performance, and integration
+      with the existing rna_16s Snakemake workflow. Debug and iterate.
+    backstory: >
+      Senior engineer who reviews bioinformatics code. You check for bugs, missing
+      error handling, incorrect tool invocations, and compatibility with the existing
+      pipeline (rna_16s.smk, align_ref.py, bc2fq.py).
+    llm:
+      provider: "openai"
+      model: "gpt-4o"
+    tools: ["code_execution"]
+
+# Tool configuration
+tools:
+  tavily_search:
+    api_key_env: "TAVILY_API_KEY"
+    max_results: 5
+  pubmed_search:
+    email_env: "PUBMED_EMAIL"
+    max_results: 10
+    db: "pubmed"
+  code_execution:
+    timeout: 30
+    allowed_modules: ["subprocess", "os", "pathlib"]
+
+# Crew settings
+crew:
+  # Max iterations for reviewer reflection loop
+  max_iterations: 3
+  # Quality threshold (0-10) to stop iteration early
+  quality_threshold: 7.0
+  # Memory: episodic memory for anti-degradation
+  memory: true
+  verbose: true
