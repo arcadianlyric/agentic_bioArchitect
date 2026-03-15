@@ -1,4 +1,4 @@
-## UMI 16S rRNA Architecture
+## UMI 16S rRNA Architecturer
 there are 2modules in this repor, 
 1. multi_agent: multi-agent general purpose LLM planer for automated workflow architecture design and code generation
 2. 16s_rRNA_workflow: designed by multi_agent module, The actual bioinformatics pipeline implementation (Snakemake workflow + Python scripts)
