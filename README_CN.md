@@ -1,23 +1,13 @@
 
-## 16S rRNA 流水线 ./src
+## 16S rRNA 架构
 
-一个 16S rRNA 微生物多样性测序分析的 legacy 项目，支持三种分析方法。该核心流水线为 `./multi_agent` 中的多代理扩展提供了基础。
+本项目包含两个模块：
+1. multi_agent：通用多代理 LLM 规划器，用于自动化工作流架构设计和代码生成
+2. 16s_rRNA_workflow：由 multi_agent 模块设计的实际生物信息学流水线实现（Snakemake 工作流 + Python 脚本）
 
-### 项目结构
+## 1. 将 multi_agent 架构应用于 UMI 16S rRNA
 
-本项目由两个主要部分组成：
-
-1. **`./multi_agent`** -- 多代理 LLM 系统，用于自动化流水线架构设计和代码生成
-2. **`./16s_rRNA_workflow`** -- 实际的生物信息学流水线实现（Snakemake 工作流 + Python 脚本）
-
-**工作流程：**
-```
-任务描述 → multi_agent（阶段 1：架构设计）→ 人工审核 → multi_agent（阶段 2：代码生成）→ 16s_rRNA_workflow（流水线执行）
-```
-
-multi_agent 模块首先设计完整的生物信息学工作流（工具、参数、步骤），然后生成实现代码。16s_rRNA_workflow 目录包含执行此设计的实际流水线。
-
-### 结果与影响力
+基于 UMI 的 16S rRNA 宏转录组丰度分析的自动化工作流设计和代码生成，采用 CrewAI 编排的多代理 LLM 系统和直接 API 工具集成。
 
 该流水线通过三种互补方法实现微生物群落分析：
 

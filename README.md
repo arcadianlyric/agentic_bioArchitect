@@ -1,20 +1,11 @@
-## UMI 16S rRNA Project Architecturer ./multi_agent
+## UMI 16S rRNA Architecture
+there are 2modules in this repor, 
+1. multi_agent: multi-agent general purpose LLM planer for automated workflow architecture design and code generation
+2. 16s_rRNA_workflow: designed by multi_agent module, The actual bioinformatics pipeline implementation (Snakemake workflow + Python scripts)
+
+## 1. Apply multi_agent_architecture on UMI 16S rRNA  
 
 Automated workflow design and code generation for UMI-based 16S rRNA metatranscriptomic abundance analysis, powered by a multi-agent LLM system with CrewAI orchestration and direct API tool integration.
-
-### Project Structure
-
-This project consists of two main components:
-
-1. **`./multi_agent`** -- Multi-agent LLM system for automated workflow architecture design and code generation
-2. **`./16s_rRNA_workflow`** -- The actual bioinformatics pipeline implementation (Snakemake workflow + Python scripts)
-
-**Workflow:**
-```
-Task Description → multi_agent (Phase 1: Architecture) → Human Review → multi_agent (Phase 2: Coding) → 16s_rRNA_workflow (Pipeline Execution)
-```
-
-The multi-agent module first designs the complete bioinformatics workflow (tools, parameters, steps), then generates the implementation code. The 16s_rRNA_workflow directory contains the actual pipeline that executes this design.
 
 ### Background
 
@@ -274,9 +265,9 @@ This project's workflow is inherently sequential and role-structured (research -
 
 ---
 
-## 16S rRNA Pipeline ./src
+## 2. 16S rRNA workflow
 
-A legacy 16S rRNA microbial diversity sequencing analysis project supporting three analysis methods. This core pipeline provides the foundation for the multi-agent extension in `./multi_agent`.
+combining architect from the multi_agent module, other llm search tools, domain knowledge, i build a 16S rRNA microbial diversity sequencing analysis project supporting three analysis methods. 
 
 ### Results and Impact
 
