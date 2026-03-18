@@ -281,7 +281,7 @@ This analysis workflow (`rna_16s.smk`) supports three methods: meta denovo assem
 The pipeline enables microbial community profiling through three complementary approaches:
 
 1. **Meta De Novo** -- Metagenome assembly using MetaSPAdes for species annotation via Kraken
-2. **Align to Ref** -- Reference-based alignment against ZymoBIOMICS 16S standard community for species identification 
+2. **Align to Ref** -- Reference-based alignment against ZymoBIOMICS 16S standard community for species identification.  
 ![Observed vs Theoretical Abundance](outputs/abundance_align_ref.png). 
 3. **Frag De Novo** (core method) -- Fragment-based assembly leveraging stLFR co-barcodes
 
