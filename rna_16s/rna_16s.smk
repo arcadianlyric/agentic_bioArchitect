@@ -1,5 +1,5 @@
 # rna_16s.smk - 16S rRNA Analysis Pipeline, as a module of a larger workflow
-# Input: Align/{SAMPLE_ID}.sort.bam from previous step
+# Input: Align/{SAMPLE_ID}.sort.bam from upstream step
 # Implements 3 methods: meta_denovo, align_ref, frag_denovo
 # Selected by config['modules']['rna_16s']: 'meta_denovo' | 'align_ref' | 'frag_denovo' | False
 configfile: "config.yaml"

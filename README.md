@@ -1,23 +1,13 @@
-## UMI 16S rRNA Architecturer
-there are 2modules in this repor, 
-1. multi_agent_architecturer: a multi-agent general purpose LLM planer for automated workflow architecture design, review and code generation.  
-2. 16s_rRNA_workflow: the actual bioinformatics pipeline implementation (Snakemake workflow + Python scripts) using the architecturer design. 
+## UMI 16S rRNA Architect
+To build a new project of 16S rRNA from scratch, I created this multi-agent tool to gether domain knowledge and architect project. There are 2 modules: 
+1. multi_agent_architect: a multi-agent general purpose LLM planer for automated workflow architecture design, review and code generation.  
+2. rna_16s: applied the multi_agent_architect to create a actual bioinformatics pipeline implementation (Snakemake workflow + Python scripts). 
 
-## 1. Apply multi_agent_architecture on UMI 16S rRNA  
+## Step1. Multi_agent_architecture  
 
-Automated workflow design and code generation for UMI-based 16S rRNA metatranscriptomic abundance analysis, powered by a multi-agent LLM system with CrewAI orchestration and direct API tool integration.
+I had no previous knowledge on 16S rRNA data analysis, so the first step is to gether domain knowledge and architect a workflow. This module is a automated workflow design and code generation powered by a multi-agent LLM system with CrewAI orchestration and direct API tool integration.    
 
-### Background
-
-16S rRNA amplicon sequencing is the standard method for microbial community profiling. When combined with UMI (Unique Molecular Identifiers), PCR amplification bias can be corrected, improving clustering accuracy and abundance estimation -- particularly important in metatranscriptomics where transcript-level quantification captures active microbial populations.
-
-Traditional tools (DADA2, Mothur, QIIME2) handle clustering and taxonomy assignment well, but integrating UMI deduplication into the workflow requires specialized tools (UMI-tools, UMI-nea) and careful parameter tuning. This project uses a multi-agent LLM system to automate the research, design, and implementation of such a pipeline.
-
-The existing analysis workflow (`rna_16s.smk`) supports three methods: meta denovo assembly, reference alignment, and fragment denovo assembly. This agentic module extends it with UMI-aware clustering and abundance estimation.
-
-**Keywords:** Multi-Agent Systems, CrewAI, UMI, 16S rRNA, Metatranscriptomics, Microbial Abundance, Grok, PubMed, Tavily
-
----
+**Keywords:** Multi-Agent Systems, CrewAI, Grok, PubMed, Tavily
 
 ### Architecture
 
@@ -111,7 +101,7 @@ Each agent's LLM provider is independently configurable (Grok, DeepSeek, OpenAI,
 #### Phase 1: Architecture Design
 
 ```bash
-cd src
+cd multi_agent_architect/src
 python main.py --phase architecture \
     --task "UMI-based 16S rRNA clustering for metatranscriptomic abundance"
 ```
@@ -122,7 +112,7 @@ python main.py --phase architecture \
 #### Phase 2: Code Generation
 
 ```bash
-cd src
+cd multi_agent_architect/src
 python main.py --phase coding \
     --architecture outputs/architecture_YYYYMMDD_HHMMSS.json
 ```
@@ -133,7 +123,7 @@ python main.py --phase coding \
 #### Full Pipeline (with interactive checkpoint)
 
 ```bash
-cd src
+cd multi_agent_architect/src
 python main.py --phase all
 ```
 
@@ -160,9 +150,7 @@ Runs Phase 1, pauses for human review, then proceeds to Phase 2.
 | Web search | [Tavily](https://tavily.com/) | AI-synthesized web search with source attribution. Direct API call (not through CrewAI) for reliability |
 | Literature search | [PubMed E-utilities](https://www.ncbi.nlm.nih.gov/books/NBK25500/) | Direct XML API to NCBI. Structured article metadata (PMID, abstract, authors) |
 | Default LLM | [Grok](https://x.ai/) (xAI) | Strong reasoning, web-grounded, OpenAI-compatible API. Configurable per agent |
-| UMI dedup (target) | [UMI-tools](https://github.com/CGATOxford/UMI-tools) | Standard for UMI extraction and deduplication in NGS |
-| Clustering (target) | [DADA2](https://benjjneb.github.io/dada2/) | ASV-level resolution, well-benchmarked for 16S |
-| Taxonomy (target) | [QIIME2](https://qiime2.org/) + SILVA | Comprehensive taxonomy assignment framework |
+
 
 #### Multi-Agent Architecture
 
@@ -205,27 +193,34 @@ The hybrid architecture combines CrewAI for agent lifecycle management with dire
 ### Project Structure
 
 ```
-agentic/
-├── config/
-│   └── agents.yaml              # Agent roles, LLM config, tool settings
-├── src/
-│   ├── main.py                  # Entry point (--phase architecture|coding|all)
-│   ├── config.py                # API key management, LLM dispatch
-│   ├── tools/
-│   │   ├── tavily_search.py     # Tavily web search (direct API)
-│   │   └── pubmed_search.py     # PubMed E-utilities (direct API)
-│   └── crews/
-│       ├── architecture_crew.py # Phase 1: Researcher + Analyst + Reviewer
-│       └── coding_crew.py       # Phase 2: Coder + code-Reviewer
-├── outputs/                     # Generated architecture docs and code
+agentic_bioArchitecturer/
+├── multi_agent_architect/           # Module 1: Multi-agent LLM system
+│   ├── config/
+│   │   └── agents.yaml             # Agent roles, LLM config, tool settings
+│   ├── src/
+│   │   ├── main.py                 # Entry point (--phase architecture|coding|all)
+│   │   ├── config.py               # API key management, LLM dispatch
+│   │   ├── tools/
+│   │   │   ├── tavily_search.py    # Tavily web search (direct API)
+│   │   │   └── pubmed_search.py    # PubMed E-utilities (direct API)
+│   │   └── crews/
+│   │       ├── architecture_crew.py # Phase 1: Researcher + Analyst + Reviewer
+│   │       └── coding_crew.py       # Phase 2: Coder + code-Reviewer
+│   ├── outputs/                     # Generated architecture docs and code
+│   ├── requirements.txt
+│   └── .env.example
+├── rna_16s/                         # Module 2: 16S rRNA Snakemake pipeline
+│   ├── rna_16s.smk                  # Snakemake workflow (3 methods)
+│   ├── rna_16s.py                   # Core analysis functions
+│   ├── align_ref.py                 # Reference alignment & abundance calculation
+│   ├── bc2fq.py                     # Barcode-to-FASTQ extraction
+│   ├── get_max_fa.py                # Select longest contig per barcode
+│   └── config.yaml                  # Pipeline configuration (samples, params, modules)
+├── outputs/                         # Final results (plots, tables)
 ├── docs/
-│   └── flowchart.mmd            # Mermaid architecture diagram
-├── llm_genetics_assistant/      # Reference project (phased variant curation)
-├── immune-drift-zero/           # Reference project (immune trajectory monitoring)
-├── swarm.py                     # Initial prototype (superseded by crews/)
-├── plan.md                      # Design rationale and decisions
-├── requirements.txt
-├── .env.example
+│   ├── 16s_Workflow.md              # Detailed workflow notes
+│   ├── plan.md                      # Development plan and decisions
+│   └── flowchart.mmd               # Mermaid architecture diagram
 ├── README.md
 └── README_CN.md
 ```
@@ -265,11 +260,25 @@ This project's workflow is inherently sequential and role-structured (research -
 
 ---
 
-## 2. 16S rRNA workflow
+## Step2. 16S rRNA workflow
 
-combining architect from the multi_agent module, other llm search tools, domain knowledge, i build a 16S rRNA microbial diversity sequencing analysis project supporting three analysis methods. 
+Harnessing architect from step1 and domain knowledge from additional LLM search, I build this 16S rRNA metatranscriptomics diversity sequencing analysis project supporting three analysis methods. 
+
+### Background
+
+16S rRNA amplicon sequencing is the standard method for microbial community profiling. When combined with UMI (Unique Molecular Identifiers), PCR amplification bias can be corrected, improving clustering accuracy and abundance estimation -- particularly important in metatranscriptomics where transcript-level quantification captures active microbial populations.
+
+Traditional tools (DADA2, Mothur, QIIME2) handle clustering and taxonomy assignment well, but integrating UMI deduplication into the workflow requires specialized tools (UMI-tools, UMI-nea) and careful parameter tuning. This project uses a multi-agent LLM system to automate the research, design, and implementation of such a pipeline.
+
+This analysis workflow (`rna_16s.smk`) supports three methods: meta denovo assembly, reference alignment, and fragment denovo assembly. This agentic module extends it with UMI-aware clustering and abundance estimation.
+
+**Keywords:** UMI, 16S rRNA, Metatranscriptomics, Microbial Abundance. 
+
+---
 
 ### Results and Impact
+
+![Observed vs Theoretical Abundance](outputs/abundance_align_ref.png)
 
 The pipeline enables microbial community profiling through three complementary approaches:
 
@@ -288,7 +297,7 @@ The Frag De Novo method is particularly powerful for stLFR (Single Tube Long Fra
 
 | Component | Description |
 |-----------|-------------|
-| Input | Paired-end FASTQ from `data/split_read.{1,2}.fq.gz` (via splitreads.smk) |
+| Input | BAM from upstream steps `Align/{SAMPLE_ID}.sort.bam`  |
 | Barcode source | stLFR co-barcodes in BAM file (BX:Z: tag) |
 | Output (general) | QUAST assembly quality reports |
 | Output (ZymoBIOMICS) | Abundance statistics comparing observed vs theoretical composition |
@@ -303,7 +312,7 @@ FASTQ → Kraken (taxonomy) → MetaSPAdes (assembly) → QUAST (evaluation)
 **Method 2: Align to Ref**
 ```
 FASTQ → BWA mem → SAMtools sort → idxstats → abundance calculation
-Reference: ZymoBIOMICS 16S standard (8 bacterial species)
+Reference: ZymoBIOMICS 16S standard (8 bacterial species, ZymoBIOMICS.STD.refseq.v2.16s.fasta)
 ```
 
 **Method 3: Frag De Novo** (main method)
@@ -331,19 +340,10 @@ merge contigs → QUAST + coverage analysis
 | Taxonomy | [Kraken](https://ccb.jhu.edu/software/kraken/) | k-mer based taxonomic classification |
 | Assembly QC | [QUAST](https://quast.sourceforge.net/) | Comprehensive assembly quality metrics |
 | Reference | ZymoBIOMICS 16S | Standard mock community (8 species) with known composition |
+| UMI dedup (target) | [UMI-tools](https://github.com/CGATOxford/UMI-tools) | Standard for UMI extraction and deduplication in NGS |
+| Clustering (target) | [DADA2](https://benjjneb.github.io/dada2/) | ASV-level resolution, well-benchmarked for 16S |
+| Taxonomy (target) | [QIIME2](https://qiime2.org/) + SILVA | Comprehensive taxonomy assignment framework |
 
-#### ZymoBIOMICS Standard Species
-
-| Species | 16S Length (bp) |
-|---------|-----------------|
-| Bacillus subtilis | 1558 |
-| Enterococcus faecalis | 1562 |
-| Escherichia coli | 1542 |
-| Lactobacillus fermentum | 1568-1578 |
-| Listeria monocytogenes | 1552 |
-| Pseudomonas aeruginosa | 1526 |
-| Salmonella enterica | 1534 |
-| Staphylococcus aureus | 1556 |
 
 #### Frag De Novo Algorithm
 

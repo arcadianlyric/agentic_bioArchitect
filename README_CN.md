@@ -1,136 +1,84 @@
+## UMI 16S rRNA 架构师
 
-## UMI 16S rRNA 架构
+从零开始构建 16S rRNA 项目，我创建了这个多代理工具来收集领域知识并进行项目架构设计。包含 2 个模块：
+1. multi_agent_architect：通用多代理 LLM 规划器，用于自动化工作流架构设计、审阅和代码生成。
+2. rna_16s：利用 multi_agent_architect 创建的实际生物信息学流水线实现（Snakemake 工作流 + Python 脚本）。
 
-本项目包含两个模块：
-1. multi_agent_architecturer LLM 规划器，用于自动化工作流架构设计和代码生成
-2. 16s_rRNA_workflow：由 architecturer 模块设计的实际生物信息学流水线实现（Snakemake 工作流 + Python 脚本）
+## Step1. 多代理架构
 
-## 1. 将 multi_agent 架构应用于 UMI 16S rRNA
+我之前没有 16S rRNA 数据分析的经验，所以第一步是收集领域知识并设计工作流。本模块是一个采用 CrewAI 编排和直接 API 工具集成的多代理 LLM 系统，实现自动化工作流设计和代码生成。
 
-基于 UMI 的 16S rRNA 宏转录组丰度分析的自动化工作流设计和代码生成，采用 CrewAI 编排的多代理 LLM 系统和直接 API 工具集成。
-
-该流水线通过三种互补方法实现微生物群落分析：
-
-1. **Meta De Novo** -- 使用 MetaSPAdes 进行宏基因组组装，通过 Kraken 进行物种注释
-2. **Align to Ref** -- 将测序 reads 比对到 ZymoBIOMICS 16S 标准菌群进行物种鉴定
-3. **Frag De Novo**（核心方法）-- 利用 stLFR 共条码进行基于 Fragment 的组装
-
-Frag De Novo 方法对 stLFR（单管长片段读取）数据特别有效，每个 DNA 片段携带唯一条码。通过按条码分组 reads，流水线执行逐片段组装，实现：
-- 从短 reads 进行伪长 reads 组装
-- 片段级别覆盖度分析
-- 复杂群落的株级别组装
-
-### 材料与方法
-
-#### 输入与输出
-
-| 组件 | 描述 |
-|------|------|
-| 输入 | 来自 `data/split_read.{1,2}.fq.gz` 的双端 FASTQ（通过 splitreads.smk） |
-| 条码来源 | BAM 文件中的 stLFR 共条码（BX:Z: 标签） |
-| 输出（常规） | QUAST 组装质量报告 |
-| 输出（ZymoBIOMICS） | 丰度统计，比较观测值与理论组成 |
-
-#### 分析工作流
-
-**方法 1: Meta De Novo**
-```
-FASTQ → Kraken（分类）→ MetaSPAdes（组装）→ QUAST（评估）
-```
-
-**方法 2: Align to Ref**
-```
-FASTQ → BWA mem → SAMtools sort → idxstats → 丰度计算
-参考序列：ZymoBIOMICS 16S 标准菌群（8 种细菌）
-```
-
-**方法 3: Frag De Novo**（主要方法）
-```
-BAM → 按 BX:Z:barcode 分组 → 筛选 200-1000 reads/barcode →
-bc2fq.py（提取 FASTQ）→ SPAdes（逐条码组装）→
-合并 contigs → QUAST + 覆盖度分析
-```
-
-#### 关键函数 (rna_16s.py)
-
-| 函数 | 用途 |
-|------|------|
-| `pct_denovoFrag_ref()` | 计算片段覆盖度与 16S 参考长度的比值 |
-| `coverage_bias()` | 可视化片段在 16S 参考上的覆盖分布 |
-| `per_base_density()` | 生成逐碱基覆盖密度图 |
-| `merge_exon_ref()` | 将多个 contigs 合并为单条序列 |
-
-#### 工具与算法
-
-| 组件 | 工具 | 选择理由 |
-|------|------|----------|
-| 组装器 | [SPAdes](https://github.com/ablab/spades) | 多功能组装器，支持多种模式（meta、rna、plasmid） |
-| 比对 | [BWA](http://bio-bwa.sourceforge.net/) | 快速短 reads 比对工具 |
-| 分类 | [Kraken](https://ccb.jhu.edu/software/kraken/) | 基于 k-mer 的分类方法 |
-| 组装质控 | [QUAST](https://quast.sourceforge.net/) | 全面的组装质量指标 |
-| 参考 | ZymoBIOMICS 16S | 标准 mock 菌群（8 种），组成已知 |
-
-#### ZymoBIOMICS 标准菌种
-
-| 菌种 | 16S 长度 (bp) |
-|------|---------------|
-| Bacillus subtilis | 1558 |
-| Enterococcus faecalis | 1562 |
-| Escherichia coli | 1542 |
-| Lactobacillus fermentum | 1568-1578 |
-| Listeria monocytogenes | 1552 |
-| Pseudomonas aeruginosa | 1526 |
-| Salmonella enterica | 1534 |
-| Staphylococcus aureus | 1556 |
-
-#### Frag De Novo 算法
-
-1. **条码分组** -- 从 BAM 中按 BX:Z: barcode 提取 reads
-2. **质量筛选** -- 选择 200-1000 reads/barcode 的条码（避免低覆盖或 PCR 重复）
-3. **逐条码组装** -- 对每个条码的 reads 运行 SPAdes
-4. **Contig 选取** -- 保留每个条码的最长 contig（contigs_max.fasta）
-5. **参考比对** -- 通过 minimap2 将 contigs 比对到 ZymoBIOMICS 16S 参考
-6. **覆盖度计算** -- 对每个片段计算：`frag_length / ref_16S_length`
-7. **丰度估计** -- 将观测覆盖度与理论 Zymo 组成进行比较
-
-### 讨论
-
-**优势：**
-- 片段级别组装保留了标准 16S 扩增子测序中丢失的长程信息
-- 逐条码组装实现复杂群落的株级别分析
-- ZymoBIOMICS 集成提供基准测试的真值
-
-**局限：**
-- 需要带共条码的 stLFR 数据（非标准 16S FASTQ）
-- 组装质量取决于逐条码的 reads 深度
-- 无 UMI 去重（PCR 偏差校正）
-
-**待办：**
-- 集成 UMI 去重以提高丰度精度
-- 添加 DADA2 风格的去噪以实现 ASV 级别分辨率
-- 基于 mock 菌群真值进行基准测试
-
----
-
-## UMI 16S rRNA 多代理分析流水线 ./multi_agent
-
-基于多代理 LLM 系统，自动化 UMI 16S rRNA 宏转录组丰度分析的工作流设计与代码生成。采用 CrewAI 编排框架与直接 API 工具集成的混合架构。
-
-### 背景
-
-16S rRNA 扩增子测序是微生物群落分析的标准方法。结合 UMI（唯一分子标识符）可以校正 PCR 扩增偏差，提高聚类准确性和丰度估计精度。这在宏转录组学中尤为重要，因为转录本水平的定量能捕捉活跃的微生物群体。
-
-传统工具（DADA2、Mothur、QIIME2）可以处理聚类和分类注释，但将 UMI 去重整合到工作流中需要专用工具（UMI-tools、UMI-nea）和精细的参数调优。本项目使用多代理 LLM 系统自动化完成这一流水线的研究、设计和实现。
-
-现有分析工作流（`src/rna_16s.smk`）支持三种方法：meta denovo 组装、参考序列比对、片段 denovo 组装。本 agentic 模块在此基础上扩展 UMI 感知的聚类和丰度估计能力。
-
-**关键词：** 多代理系统、CrewAI、UMI、16S rRNA、宏转录组学、微生物丰度、Grok、PubMed、Tavily
-
----
+**关键词：** 多代理系统、CrewAI、Grok、PubMed、Tavily
 
 ### 架构
 
-![flowchart](docs/flowchart.mmd)
+```mermaid
+graph TD
+    subgraph Phase1["阶段 1：架构模块"]
+        R[Researcher Agent]
+        A[Analyst Agent]
+        V[Architecture Reviewer]
+
+        R -->|工具、论文、基准| A
+        A -->|工作流设计| V
+        V -->|评分 < 7：反馈| A
+        V -->|评分 >= 7：通过| HRC
+    end
+
+    subgraph Tools["直接 API 工具"]
+        T1[Tavily Web 搜索]
+        T2[PubMed E-utilities]
+        T3[代码执行]
+    end
+
+    R -.->|搜索| T1
+    R -.->|文献| T2
+    V -.->|事实核查| T1
+
+    HRC{人工审阅检查点}
+
+    subgraph Phase2["阶段 2：编码模块"]
+        C[Coder Agent]
+        CR[Code Reviewer]
+
+        C -->|实现| CR
+        CR -->|评分 < 7：修改指令| C
+        CR -->|评分 >= 7：通过| OUT
+    end
+
+    C -.->|语法测试| T3
+    CR -.->|验证| T3
+
+    HRC -->|已批准| Phase2
+
+    subgraph Config["配置"]
+        CFG[config/agents.yaml]
+        ENV[.env API 密钥]
+        CFG -.-> Phase1
+        CFG -.-> Phase2
+        ENV -.-> Tools
+    end
+
+    subgraph LLM["LLM 提供商（可按 Agent 配置）"]
+        G[Grok / xAI]
+        DS[DeepSeek]
+        OA[OpenAI]
+        GM[Google Gemini]
+    end
+
+    Phase1 -.-> LLM
+    Phase2 -.-> LLM
+
+    OUT[输出：umi_abundance.py + Snakemake 规则]
+
+    subgraph Existing["现有流水线"]
+        SMK[rna_16s.smk]
+        AR[align_ref.py]
+        R16[rna_16s.py]
+    end
+
+    OUT -->|集成| Existing
+```
 
 系统分为两个阶段，中间设有人工审阅检查点：
 
@@ -154,7 +102,7 @@ bc2fq.py（提取 FASTQ）→ SPAdes（逐条码组装）→
 #### 阶段 1：架构设计
 
 ```bash
-cd src
+cd multi_agent_architect/src
 python main.py --phase architecture \
     --task "UMI-based 16S rRNA clustering for metatranscriptomic abundance"
 ```
@@ -165,7 +113,7 @@ python main.py --phase architecture \
 #### 阶段 2：代码生成
 
 ```bash
-cd src
+cd multi_agent_architect/src
 python main.py --phase coding \
     --architecture outputs/architecture_YYYYMMDD_HHMMSS.json
 ```
@@ -176,7 +124,7 @@ python main.py --phase coding \
 #### 完整流水线（含交互式暂停）
 
 ```bash
-cd src
+cd multi_agent_architect/src
 python main.py --phase all
 ```
 
@@ -203,9 +151,6 @@ python main.py --phase all
 | Web 搜索 | [Tavily](https://tavily.com/) | AI 综合的网络搜索，带来源归属。直接 API 调用（不经过 CrewAI）以确保可靠性 |
 | 文献搜索 | [PubMed E-utilities](https://www.ncbi.nlm.nih.gov/books/NBK25500/) | 直接 XML API 访问 NCBI，结构化的文章元数据（PMID、摘要、作者） |
 | 默认 LLM | [Grok](https://x.ai/)（xAI） | 强推理能力，网络事实根基，OpenAI 兼容 API。可按 Agent 配置 |
-| UMI 去重（目标） | [UMI-tools](https://github.com/CGATOxford/UMI-tools) | NGS UMI 提取和去重的标准工具 |
-| 聚类（目标） | [DADA2](https://benjjneb.github.io/dada2/) | ASV 级分辨率，16S 领域充分基准测试 |
-| 分类注释（目标） | [QIIME2](https://qiime2.org/) + SILVA | 综合性分类注释框架 |
 
 #### 多代理架构
 
@@ -231,7 +176,7 @@ python main.py --phase all
 
 1. 安装依赖：
    ```bash
-   pip install -r requirements.txt
+   pip install -r multi_agent_architect/requirements.txt
    ```
 
 2. 配置 API 密钥 -- 复制 `.env.example` 为 `.env`：
@@ -248,27 +193,34 @@ python main.py --phase all
 ### 项目结构
 
 ```
-agentic/
-├── config/
-│   └── agents.yaml              # Agent 角色、LLM 配置、工具设置
-├── src/
-│   ├── main.py                  # 入口（--phase architecture|coding|all）
-│   ├── config.py                # API 密钥管理、LLM 分发
-│   ├── tools/
-│   │   ├── tavily_search.py     # Tavily 网络搜索（直接 API）
-│   │   └── pubmed_search.py     # PubMed E-utilities（直接 API）
-│   └── crews/
-│       ├── architecture_crew.py # 阶段 1：Researcher + Analyst + Reviewer
-│       └── coding_crew.py       # 阶段 2：Coder + code-Reviewer
-├── outputs/                     # 生成的架构文档和代码
+agentic_bioArchitecturer/
+├── multi_agent_architect/           # 模块 1：多代理 LLM 系统
+│   ├── config/
+│   │   └── agents.yaml             # Agent 角色、LLM 配置、工具设置
+│   ├── src/
+│   │   ├── main.py                 # 入口（--phase architecture|coding|all）
+│   │   ├── config.py               # API 密钥管理、LLM 分发
+│   │   ├── tools/
+│   │   │   ├── tavily_search.py    # Tavily 网络搜索（直接 API）
+│   │   │   └── pubmed_search.py    # PubMed E-utilities（直接 API）
+│   │   └── crews/
+│   │       ├── architecture_crew.py # 阶段 1：Researcher + Analyst + Reviewer
+│   │       └── coding_crew.py       # 阶段 2：Coder + code-Reviewer
+│   ├── outputs/                     # 生成的架构文档和代码
+│   ├── requirements.txt
+│   └── .env.example
+├── rna_16s/                         # 模块 2：16S rRNA Snakemake 流水线
+│   ├── rna_16s.smk                  # Snakemake 工作流（3 种方法）
+│   ├── rna_16s.py                   # 核心分析函数
+│   ├── align_ref.py                 # 参考比对与丰度计算
+│   ├── bc2fq.py                     # 条码转 FASTQ 提取
+│   ├── get_max_fa.py                # 选取每个条码的最长 contig
+│   └── config.yaml                  # 流水线配置（样本、参数、模块）
+├── outputs/                         # 最终结果（图表）
 ├── docs/
-│   └── flowchart.mmd            # Mermaid 架构图
-├── llm_genetics_assistant/      # 参考项目（变异注释策展）
-├── immune-drift-zero/           # 参考项目（免疫轨迹监测）
-├── swarm.py                     # 初始原型（已被 crews/ 取代）
-├── plan.md                      # 设计决策文档
-├── requirements.txt
-├── .env.example
+│   ├── 16s_Workflow.md              # 详细工作流笔记
+│   ├── plan.md                      # 开发计划与决策
+│   └── flowchart.mmd               # Mermaid 架构图
 ├── README.md
 └── README_CN.md
 ```
@@ -305,6 +257,119 @@ agentic/
 - [ ] 添加 RAG 层（FAISS），跨运行持久化文献上下文
 - [ ] 迁移至 LangGraph，实现跨会话的有状态检查点
 - [ ] 并行 Researcher 子代理（Swarm 风格），用于多数据库搜索
+
+---
+
+## Step2. 16S rRNA 工作流
+
+利用 Step1 的架构设计和额外 LLM 搜索获取的领域知识，构建了这个 16S rRNA 宏转录组多样性测序分析项目，支持三种分析方法。
+
+### 背景
+
+16S rRNA 扩增子测序是微生物群落分析的标准方法。结合 UMI（唯一分子标识符）可以校正 PCR 扩增偏差，提高聚类准确性和丰度估计精度。这在宏转录组学中尤为重要，因为转录本水平的定量能捕捉活跃的微生物群体。
+
+传统工具（DADA2、Mothur、QIIME2）可以处理聚类和分类注释，但将 UMI 去重整合到工作流中需要专用工具（UMI-tools、UMI-nea）和精细的参数调优。本项目使用多代理 LLM 系统自动化完成这一流水线的研究、设计和实现。
+
+分析工作流（`rna_16s.smk`）支持三种方法：meta denovo 组装、参考序列比对、片段 denovo 组装。本 agentic 模块在此基础上扩展 UMI 感知的聚类和丰度估计能力。
+
+**关键词：** UMI、16S rRNA、宏转录组学、微生物丰度
+
+---
+
+### 结果与影响
+
+![观测值与理论丰度对比](outputs/abundance_align_ref.png)
+
+该流水线通过三种互补方法实现微生物群落分析：
+
+1. **Meta De Novo** -- 使用 MetaSPAdes 进行宏基因组组装，通过 Kraken 进行物种注释
+2. **Align to Ref** -- 将测序 reads 比对到 ZymoBIOMICS 16S 标准菌群进行物种鉴定
+3. **Frag De Novo**（核心方法）-- 利用 stLFR 共条码进行基于 Fragment 的组装
+
+Frag De Novo 方法对 stLFR（单管长片段读取）数据特别有效，每个 DNA 片段携带唯一条码。通过按条码分组 reads，流水线执行逐片段组装，实现：
+- 从短 reads 进行伪长 reads 组装
+- 片段级别覆盖度分析
+- 复杂群落的株级别组装
+
+### 材料与方法
+
+#### 输入与输出
+
+| 组件 | 描述 |
+|------|------|
+| 输入 | 上游步骤的 BAM 文件 `Align/{SAMPLE_ID}.sort.bam` |
+| 条码来源 | BAM 文件中的 stLFR 共条码（BX:Z: 标签） |
+| 输出（常规） | QUAST 组装质量报告 |
+| 输出（ZymoBIOMICS） | 丰度统计，比较观测值与理论组成 |
+
+#### 分析工作流
+
+**方法 1: Meta De Novo**
+```
+FASTQ → Kraken（分类）→ MetaSPAdes（组装）→ QUAST（评估）
+```
+
+**方法 2: Align to Ref**
+```
+FASTQ → BWA mem → SAMtools sort → idxstats → 丰度计算
+参考序列：ZymoBIOMICS 16S 标准菌群（8 种细菌，ZymoBIOMICS.STD.refseq.v2.16s.fasta）
+```
+
+**方法 3: Frag De Novo**（主要方法）
+```
+BAM → 按 BX:Z:barcode 分组 → 筛选 200-1000 reads/barcode →
+bc2fq.py（提取 FASTQ）→ SPAdes（逐条码组装）→
+合并 contigs → QUAST + 覆盖度分析
+```
+
+#### 关键函数 (rna_16s.py)
+
+| 函数 | 用途 |
+|------|------|
+| `pct_denovoFrag_ref()` | 计算片段覆盖度与 16S 参考长度的比值 |
+| `coverage_bias()` | 可视化片段在 16S 参考上的覆盖分布 |
+| `per_base_density()` | 生成逐碱基覆盖密度图 |
+| `merge_exon_ref()` | 将多个 contigs 合并为单条序列 |
+
+#### 工具与算法
+
+| 组件 | 工具 | 选择理由 |
+|------|------|----------|
+| 组装器 | [SPAdes](https://github.com/ablab/spades) | 多功能组装器，支持多种模式（meta、rna、plasmid） |
+| 比对 | [BWA](http://bio-bwa.sourceforge.net/) | 快速短 reads 比对工具 |
+| 分类 | [Kraken](https://ccb.jhu.edu/software/kraken/) | 基于 k-mer 的分类方法 |
+| 组装质控 | [QUAST](https://quast.sourceforge.net/) | 全面的组装质量指标 |
+| 参考 | ZymoBIOMICS 16S | 标准 mock 菌群（8 种），组成已知 |
+| UMI 去重（目标） | [UMI-tools](https://github.com/CGATOxford/UMI-tools) | NGS UMI 提取和去重的标准工具 |
+| 聚类（目标） | [DADA2](https://benjjneb.github.io/dada2/) | ASV 级分辨率，16S 领域充分基准测试 |
+| 分类注释（目标） | [QIIME2](https://qiime2.org/) + SILVA | 综合性分类注释框架 |
+
+#### Frag De Novo 算法
+
+1. **条码分组** -- 从 BAM 中按 BX:Z: barcode 提取 reads
+2. **质量筛选** -- 选择 200-1000 reads/barcode 的条码（避免低覆盖或 PCR 重复）
+3. **逐条码组装** -- 对每个条码的 reads 运行 SPAdes
+4. **Contig 选取** -- 保留每个条码的最长 contig（contigs_max.fasta）
+5. **参考比对** -- 通过 minimap2 将 contigs 比对到 ZymoBIOMICS 16S 参考
+6. **覆盖度计算** -- 对每个片段计算：`frag_length / ref_16S_length`
+7. **丰度估计** -- 将观测覆盖度与理论 Zymo 组成进行比较
+
+### 讨论
+
+**优势：**
+- 片段级别组装保留了标准 16S 扩增子测序中丢失的长程信息
+- 逐条码组装实现复杂群落的株级别分析
+- ZymoBIOMICS 集成提供基准测试的真值
+
+**局限：**
+- 需要带共条码的 stLFR 数据（非标准 16S FASTQ）
+- 组装质量取决于逐条码的 reads 深度
+- 无 UMI 去重（PCR 偏差校正）
+
+**待办：**
+- 集成 UMI 去重以提高丰度精度
+- 添加 DADA2 风格的去噪以实现 ASV 级别分辨率
+- 基于 mock 菌群真值进行基准测试
 
 ---
 
