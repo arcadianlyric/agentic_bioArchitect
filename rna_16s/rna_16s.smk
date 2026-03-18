@@ -1,15 +1,15 @@
-# rna_16s.smk - 16S rRNA Analysis Pipeline
-# Input: data/split_read.{i}.fq.gz from splitreads.smk
+# rna_16s.smk - 16S rRNA Analysis Pipeline, as a module of a larger workflow
+# Input: Align/{SAMPLE_ID}.sort.bam from previous step
 # Implements 3 methods: meta_denovo, align_ref, frag_denovo
 # Selected by config['modules']['rna_16s']: 'meta_denovo' | 'align_ref' | 'frag_denovo' | False
-
+configfile: "config.yaml"
 import os
 from pathlib import Path
 
 # ============================================================================
 # Configuration from config.yaml
 # ============================================================================
-RNA_16S_MODE = config['modules'].get('rna_16s', False)
+RNA_16S_MODE = config['modules'].get('rna_16s', 'align_ref')
 SAMPLE_ID = config['samples'].get('id', 'data')
 REF_16S = config['params'].get('ref_fa_other', '')
 SEQUENCE_TYPE = config['params'].get('sequence_type', 'pe').lower()
@@ -20,13 +20,13 @@ MIN_READS_BC = config['params'].get('min_reads_bc', 200)
 MAX_READS_BC = config['params'].get('max_reads_bc', 1000)
 
 # Tool paths from config
-PYTHON = config['params'].get('general_python', '/home/ycai/anaconda3/bin/python')
-SPADES = config['frag_de_novo'].get('denovo_assembler', '/home/ycai/tools/SPAdes-3.14.0-Linux/bin/spades.py')
-QUAST = config['frag_de_novo'].get('quast_dir', '/home/eanderson/quast/quast.py')
-MINIMAP = config['frag_de_novo'].get('minimap', '/home/eanderson/minimap2-2.16_x64-linux/minimap2')
-BWA = '/home/ycai/anaconda3/bin/bwa'
-SAMTOOLS = '/home/ycai/anaconda3/bin/samtools'
-SCRIPT_DIR = str(Path(workflow.basedir).parent / 'src' / 'rna_16s')
+PYTHON = config['params'].get('general_python', 'python3')
+SPADES = config['frag_de_novo'].get('denovo_assembler', 'SPAdes-3.14.0-Linux/bin/spades.py')
+QUAST = config['frag_de_novo'].get('quast_dir', 'quast.py')
+MINIMAP = config['frag_de_novo'].get('minimap', 'minimap2')
+BWA='bwa'
+SAMTOOLS='samtools'
+SCRIPT_DIR = str(Path(workflow.basedir).parent / 'rna_16s')
 
 # Thread counts
 THREADS_BWA = config['threads'].get('bwa', 20)
@@ -41,7 +41,7 @@ def get_rna_16s_targets():
     if RNA_16S_MODE == 'meta_denovo':
         targets.extend(["rna_16s/meta_denovo/contigs.fasta", "rna_16s/quast/meta_denovo/report.txt"])
     elif RNA_16S_MODE == 'align_ref':
-        targets.extend([f"Align/{SAMPLE_ID}.sort.bam", "rna_16s/align_ref/abundance_align_ref.png"])
+        targets.extend([ "rna_16s/align_ref/abundance_align_ref.png"])
     elif RNA_16S_MODE == 'frag_denovo':
         targets.extend(["rna_16s/frag_denovo/all.contigs_max.fasta", "rna_16s/quast/frag_denovo/report.txt"])
     return targets
@@ -84,14 +84,13 @@ rule meta_denovo:
 #         bai=f"Align/{SAMPLE_ID}.sort.bam.bai"
 #     params:
 #         ref=REF_16S,
-#         bwa=BWA,
 #         samtools=SAMTOOLS,
 #         threads=THREADS_BWA,
 #         sample=SAMPLE_ID
 #     shell:
 #         """
 #         mkdir -p Align
-#         {params.bwa} mem -M \
+#         bwa mem -M \
 #             -R '@RG\\tID:{params.sample}\\tSM:{params.sample}\\tPL:BGI-seq' \
 #             -C -t {params.threads} {params.ref} {input.r2} \
 #             2>Align/aln.err \
@@ -170,7 +169,7 @@ def get_bc_contigs(wildcards):
     return expand("rna_16s/frag_denovo/spades/{bc}/contigs_max.fasta", bc=bcs)
 
 # Step 3.1: Select barcodes with appropriate read count (checkpoint for dynamic DAG)
-checkpoint frag_denovo_bc_stats:
+rule frag_denovo_bc_stats:
     input:
         "split_stat_read1.log"
     output:
