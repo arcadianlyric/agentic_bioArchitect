@@ -1,15 +1,10 @@
 samples:
-    # sample or id to use for generating targets
     id: "data"
-    # Chromosomes to evaluate for fragment length and phasing
-    # Leave empty for cDNA/mRNA ref or if there are too many chromosomes to specify or you're unsure
-    # This will force snakemake to evaluate all chromosomes
     chroms: [chr1, chr2, chr3, chr4, chr5, chr6, chr7, chr8, chr9, chr10, chr11, chr12, chr13, chr14, chr15, chr16, chr17, chr18, chr19, chr20, chr21, chr22, chrX, chrY]
 
 modules:
     # rna 16s, 'frag_denovo',  'frag_denovo', 'align_ref'
     rna_16s: 'align_ref'
-
 
 params:
     # sequence_type, pe or se, lower case
@@ -27,13 +22,9 @@ frag_de_novo:
     spades_phred_offset: 55
     quast_dir: "quast/quast.py"
     quast_min_contig: 100
-    # default true
     quast_space_efficient: True
     minimap: "minimap2-2.16_x64-linux/minimap2"
-    # denovo_type: mrna=correlct_rc or 16s=correct_rc
     denovo_type: 'correct_rc'
-    # if to run on sigle node: how many lines to process for denovo, set to a dummy number 1000000000 to run all
-    # if to run on multiple node: = chunk_length  
     end_idx: 485000000
     start_idx: 1
     flank_end: 30
