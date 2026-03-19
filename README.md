@@ -7,7 +7,7 @@ To build a new project of 16S rRNA from scratch, I created this multi-agent tool
 
 I had no previous knowledge on 16S rRNA data analysis, so the first step is to gether domain knowledge and architect a workflow. This module is a automated workflow design and code generation powered by a multi-agent LLM system with CrewAI orchestration and direct API tool integration.    
 
-**Keywords:** Multi-Agent Systems, CrewAI, Grok, PubMed, Tavily
+**Keywords:** Multi-Agent Systems, CrewAI, LLM, literature search and decision making
 
 ### Architecture
 
@@ -149,7 +149,7 @@ Runs Phase 1, pauses for human review, then proceeds to Phase 2.
 | Agent orchestration | [CrewAI](https://github.com/crewai/crewai) | Role-based agents with built-in delegation, reflection loops, and episodic memory. Best fit for structured sequential tasks with iterative quality control |
 | Web search | [Tavily](https://tavily.com/) | AI-synthesized web search with source attribution. Direct API call (not through CrewAI) for reliability |
 | Literature search | [PubMed E-utilities](https://www.ncbi.nlm.nih.gov/books/NBK25500/) | Direct XML API to NCBI. Structured article metadata (PMID, abstract, authors) |
-| Default LLM | [Grok](https://x.ai/) (xAI) | Strong reasoning, web-grounded, OpenAI-compatible API. Configurable per agent |
+| Default LLM | [Grok](https://x.ai/) (xAI) | Strong searching, web-grounded, OpenAI-compatible API. Configurable per agent |
 
 
 #### Multi-Agent Architecture
@@ -382,7 +382,7 @@ merge contigs → QUAST + coverage analysis
 4. [QIIME2](https://qiime2.org/) -- Microbiome bioinformatics platform
 5. [Tavily](https://tavily.com/) -- Web search API with AI synthesis
 6. [PubMed E-utilities](https://www.ncbi.nlm.nih.gov/books/NBK25500/) -- NCBI literature API
-7. [Grok](https://x.ai/) -- xAI large language model
+7. [Kraken](https://ccb.jhu.edu/software/kraken/) -- Taxonomic classification
 8. [ZymoBIOMICS](https://www.zymoresearch.com/collections/zymobiomics-microbial-community-standards) -- Microbial community standard
 9. [mclUMI](https://doi.org/10.1093/bioinformatics/btaf068) -- Markov clustering for UMI deduplication (2025)
 10. [SPAdes](https://github.com/ablab/spades) -- De novo genome assembler
