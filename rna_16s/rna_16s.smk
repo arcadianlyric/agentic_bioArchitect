@@ -16,14 +16,14 @@ SEQUENCE_TYPE = config['params'].get('sequence_type', 'pe').lower()
 
 # Frag denovo params
 N_FRAG = config['params'].get('n_frag', 100)
-MIN_READS_BC = config['params'].get('min_reads_bc', 200)
+MIN_READS_BC = config['params'].get('min_reads_bc', 50)
 MAX_READS_BC = config['params'].get('max_reads_bc', 1000)
 
 # Tool paths from config
 PYTHON = config['params'].get('general_python', 'python3')
 SPADES = config['frag_de_novo'].get('denovo_assembler', 'SPAdes-3.14.0-Linux/bin/spades.py')
-QUAST = config['frag_de_novo'].get('quast_dir', 'quast.py')
-MINIMAP = config['frag_de_novo'].get('minimap', 'minimap2')
+QUAST = config['frag_de_novo'].get('quast_dir', 'quast/quast.py')
+MINIMAP = config['frag_de_novo'].get('minimap', 'minimap2-2.16_x64-linux/minimap2')
 BWA='bwa'
 SAMTOOLS='samtools'
 SCRIPT_DIR = str(Path(workflow.basedir).parent / 'rna_16s')
