@@ -3,7 +3,7 @@ samples:
     chroms: [chr1, chr2, chr3, chr4, chr5, chr6, chr7, chr8, chr9, chr10, chr11, chr12, chr13, chr14, chr15, chr16, chr17, chr18, chr19, chr20, chr21, chr22, chrX, chrY]
 
 modules:
-    # rna 16s, 'frag_denovo',  'frag_denovo', 'align_ref'
+    # rna 16s: 'meta_denovo', 'frag_denovo', 'align_ref', 'per_umi_denovo'
     rna_16s: 'align_ref'
 
 params:
@@ -13,6 +13,16 @@ params:
     n_frag: 100
     min_reads_bc: 50
     max_reads_bc: 1000
+
+per_umi_denovo:
+    min_reads_per_umi: 5
+    max_reads_per_umi: 500
+    k_list: '21,41,61,81'
+    threads_per_umi: 4
+    threads_total: 32
+    consensus_min_length: 1400
+    bx_pattern: 'BX:Z:(\S+)'
+    megahit: '/path/to/megahit'
 
 frag_de_novo:
     run_parallel: False

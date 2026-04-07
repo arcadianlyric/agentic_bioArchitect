@@ -210,11 +210,15 @@ agentic_bioArchitecturer/
 │   ├── requirements.txt
 │   └── .env.example
 ├── rna_16s/                         # Module 2: 16S rRNA Snakemake pipeline
-│   ├── rna_16s.smk                  # Snakemake workflow (3 methods)
+│   ├── rna_16s.smk                  # Snakemake workflow (4 methods)
+│   ├── perUMI_denovo.smk            # Method 4: per-UMI MEGAHIT assembly (included by rna_16s.smk)
 │   ├── rna_16s.py                   # Core analysis functions
 │   ├── align_ref.py                 # Reference alignment & abundance calculation
 │   ├── bc2fq.py                     # Barcode-to-FASTQ extraction
-│   ├── get_max_fa.py                # Select longest contig per barcode
+│   ├── get_max_fa.py                # Select longest contig per barcode/UMI
+│   ├── group_reads_by_umi.py        # Group PE reads by BX:Z: UMI tag
+│   ├── per_umi_megahit_consensus.py # MEGAHIT de novo per UMI (parallel)
+│   ├── consensus_per_umi.py         # Post-assembly contig QC and length filtering
 │   └── config.yaml                  # Pipeline configuration (samples, params, modules)
 ├── outputs/                         # Final results (plots, tables)
 ├── docs/
@@ -270,7 +274,7 @@ Harnessing architect from step1 and domain knowledge from additional LLM search,
 
 Traditional tools (DADA2, Mothur, QIIME2) handle clustering and taxonomy assignment well, but integrating UMI deduplication into the workflow requires specialized tools (UMI-tools, UMI-nea) and careful parameter tuning. This project uses a multi-agent LLM system to automate the research, design, and implementation of such a pipeline.
 
-This analysis workflow (`rna_16s.smk`) supports three methods: meta denovo assembly, reference alignment, and fragment denovo assembly. This agentic module extends it with UMI-aware clustering and abundance estimation.
+This analysis workflow (`rna_16s.smk`) supports four methods: meta denovo assembly, reference alignment, fragment denovo assembly, and per-UMI de novo assembly for full-length 16S.
 
 **Keywords:** UMI, 16S rRNA, Metatranscriptomics, Microbial Abundance. 
 
@@ -278,17 +282,18 @@ This analysis workflow (`rna_16s.smk`) supports three methods: meta denovo assem
 
 ### Results and Impact
 
-The pipeline enables microbial community profiling through three complementary approaches:
+The pipeline enables microbial community profiling through four complementary approaches:
 
 1. **Meta De Novo** -- Metagenome assembly using MetaSPAdes for species annotation via Kraken
 2. **Align to Ref** -- Reference-based alignment against ZymoBIOMICS 16S standard community for species identification.  
-![Observed vs Theoretical Abundance](outputs/abundance_align_ref.png). 
-3. **Frag De Novo** (core method) -- Fragment-based assembly leveraging stLFR co-barcodes
+![Observed vs Theoretical Abundance](outputs/abundance_align_ref.png)
+3. **Frag De Novo** -- Fragment-based assembly leveraging stLFR co-barcodes (BX tag), grouping reads by barcode → per-barcode SPAdes assembly → longest contig selection
+4. **Per-UMI De Novo** (new) -- Full-length 16S reconstruction for PE150 data. Each UMI (BX tag, 15bp) represents a single 16S molecule. MEGAHIT assembles ~50 reads/UMI at ~10x depth, producing full-length (~1500bp) consensus sequences without reference mapping.
 
-The Frag De Novo method is particularly powerful for stLFR (Single Tube Long Fragment read) data, where each DNA fragment carries a unique barcode. By grouping reads by barcode, the pipeline performs per-fragment assembly, enabling:
-- Pseudo-long-read assembly from short reads
-- Fragment-level coverage analysis
-- Strain-resolved assembly for complex communities
+The Per-UMI De Novo method addresses PCR amplification bias at the single-molecule level:
+- MEGAHIT over SPAdes: lower startup cost, better at ~10x coverage on 1500bp, no over-correction of amplicon data
+- Parallel assembly: `ThreadPoolExecutor` runs multiple UMI groups concurrently
+- Length filtering: contigs < 1400bp discarded (incomplete 16S)
 
 ### Materials and Methods
 
@@ -296,8 +301,9 @@ The Frag De Novo method is particularly powerful for stLFR (Single Tube Long Fra
 
 | Component | Description |
 |-----------|-------------|
-| Input | BAM from upstream steps `Align/{SAMPLE_ID}.sort.bam`  |
-| Barcode source | stLFR co-barcodes in BAM file (BX:Z: tag) |
+| Input (meta/align/frag) | BAM from upstream steps `Align/{SAMPLE_ID}.sort.bam` |
+| Input (per_umi_denovo) | PE150 FASTQ `data/split_read.{1,2}.fq.gz` with BX:Z: tag (15bp UMI) |
+| UMI/Barcode source | BX:Z: tag in FASTQ header (same field for all methods) |
 | Output (general) | QUAST assembly quality reports |
 | Output (ZymoBIOMICS) | Abundance statistics comparing observed vs theoretical composition |
 
@@ -314,11 +320,19 @@ FASTQ → BWA mem → SAMtools sort → idxstats → abundance calculation
 Reference: ZymoBIOMICS 16S standard (8 bacterial species, ZymoBIOMICS.STD.refseq.v2.16s.fasta)
 ```
 
-**Method 3: Frag De Novo** (main method)
+**Method 3: Frag De Novo**
 ```
 BAM → group by BX:Z:barcode → filter 200-1000 reads/barcode →
 bc2fq.py (extract FASTQ) → SPAdes (per-barcode assembly) →
 merge contigs → QUAST + coverage analysis
+```
+
+**Method 4: Per-UMI De Novo** (full-length 16S, PE150)
+```
+FASTQ (BX:Z: tag) → fastp trim →
+group_reads_by_umi.py (15bp UMI → per-UMI FASTQ, ≥5 reads) →
+per_umi_megahit_consensus.py (MEGAHIT per UMI, parallel) →
+filter ≥1400bp → merge → QUAST + Zymo abundance
 ```
 
 #### Key Functions (rna_16s.py)
@@ -334,14 +348,14 @@ merge contigs → QUAST + coverage analysis
 
 | Component | Tool | Rationale |
 |-----------|------|-----------|
-| Assembler | [SPAdes](https://github.com/ablab/spades) | Versatile assembler supporting multiple modes (meta, rna, plasmid) |
+| Assembler (meta/frag) | [SPAdes](https://github.com/ablab/spades) | Versatile assembler supporting meta, rna, plasmid modes |
+| Assembler (per-UMI) | [MEGAHIT](https://github.com/voutcn/megahit) | Succinct De Bruijn Graph, lower memory, better at ~10x coverage than SPAdes --isolate for amplicon data |
+| Read trimming | [fastp](https://github.com/OpenGene/fastp) | Fast PE adapter trimming |
 | Alignment | [BWA](http://bio-bwa.sourceforge.net/) | Fast short-read aligner for reference mapping |
 | Taxonomy | [Kraken](https://ccb.jhu.edu/software/kraken/) | k-mer based taxonomic classification |
 | Assembly QC | [QUAST](https://quast.sourceforge.net/) | Comprehensive assembly quality metrics |
 | Reference | ZymoBIOMICS 16S | Standard mock community (8 species) with known composition |
-| UMI dedup (target) | [UMI-tools](https://github.com/CGATOxford/UMI-tools) | Standard for UMI extraction and deduplication in NGS |
-| Clustering (target) | [DADA2](https://benjjneb.github.io/dada2/) | ASV-level resolution, well-benchmarked for 16S |
-| Taxonomy (target) | [QIIME2](https://qiime2.org/) + SILVA | Comprehensive taxonomy assignment framework |
+| Clustering (downstream) | [DADA2](https://benjjneb.github.io/dada2/) | ASV-level resolution, well-benchmarked for 16S |
 
 
 #### Frag De Novo Algorithm
@@ -362,14 +376,16 @@ merge contigs → QUAST + coverage analysis
 - ZymoBIOMICS integration provides ground truth for benchmarking
 
 **Limitations:**
-- Requires stLFR data with co-barcodes (not standard 16S FASTQ)
-- Assembly quality depends on per-barcode read depth
-- No UMI deduplication (PCR bias correction)
+- Frag De Novo requires stLFR data with BX-tagged barcodes
+- Per-UMI De Novo requires ≥5 reads/UMI and ~10x depth; UMI groups with fewer reads are discarded
+- Full-length 16S + PE150: reads cannot be merged, assembly required (no simple majority-vote)
 
 **To-Do:**
-- Integrate UMI deduplication for improved abundance accuracy
-- Add DADA2-style denoising for ASV-level resolution
-- Benchmark against mock community ground truth
+- [x] Per-UMI de novo assembly (MEGAHIT, Method 4)
+- [ ] End-to-end test with real UMI 16S FASTQ data
+- [ ] Benchmark per-UMI contigs against ZymoBIOMICS ground truth
+- [ ] Downstream DADA2/vsearch clustering on per-UMI consensus sequences
+- [ ] Add RAG layer (FAISS) for persistent literature context across runs
 
 ---
 

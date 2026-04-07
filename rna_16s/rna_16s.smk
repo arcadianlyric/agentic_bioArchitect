@@ -1,7 +1,8 @@
 # rna_16s.smk - 16S rRNA Analysis Pipeline, as a module of a larger workflow
-# Input: Align/{SAMPLE_ID}.sort.bam from upstream step
-# Implements 3 methods: meta_denovo, align_ref, frag_denovo
-# Selected by config['modules']['rna_16s']: 'meta_denovo' | 'align_ref' | 'frag_denovo' | False
+# Input: Align/{SAMPLE_ID}.sort.bam from upstream step (align_ref/meta_denovo/frag_denovo)
+#        data/split_read.{1,2}.fq.gz (per_umi_denovo)
+# Implements 4 methods: meta_denovo, align_ref, frag_denovo, per_umi_denovo
+# Selected by config['modules']['rna_16s']: 'meta_denovo' | 'align_ref' | 'frag_denovo' | 'per_umi_denovo' | False
 configfile: "config.yaml"
 import os
 from pathlib import Path
@@ -41,9 +42,12 @@ def get_rna_16s_targets():
     if RNA_16S_MODE == 'meta_denovo':
         targets.extend(["rna_16s/meta_denovo/contigs.fasta", "rna_16s/quast/meta_denovo/report.txt"])
     elif RNA_16S_MODE == 'align_ref':
-        targets.extend([ "rna_16s/align_ref/abundance_align_ref.png"])
+        targets.extend(["rna_16s/align_ref/abundance_align_ref.png"])
     elif RNA_16S_MODE == 'frag_denovo':
         targets.extend(["rna_16s/frag_denovo/all.contigs_max.fasta", "rna_16s/quast/frag_denovo/report.txt"])
+    elif RNA_16S_MODE == 'per_umi_denovo':
+        targets.extend(["rna_16s/per_umi_denovo/all_umi_contigs.fasta",
+                         "rna_16s/quast/per_umi_denovo/report.txt"])
     return targets
 
 rule rna_16s_all:
@@ -292,3 +296,10 @@ rule abundance_align_ref:
         {params.python} {params.script} --bam {input.bam} \
             --outdir {params.outdir} --ref_fasta {params.ref_fasta}
         """
+
+
+# ============================================================================
+# Method 4: Per-UMI De Novo Assembly (included from separate file)
+# ============================================================================
+if RNA_16S_MODE == 'per_umi_denovo':
+    include: "perUMI_denovo.smk"
