@@ -12,71 +12,66 @@ I had no previous knowledge on 16S rRNA data analysis, so the first step is to g
 ### Architecture
 
 ```mermaid
-graph TD
+flowchart TD
     subgraph Phase1["Phase 1: Architecture Module"]
-        R[Researcher Agent]
-        A[Analyst Agent]
-        V[Architecture Reviewer]
-        
-        R -->|tools, papers, benchmarks| A
-        A -->|workflow design| V
-        V -->|score < 7: feedback| A
-        V -->|score >= 7: PASS| HRC
+        R["Researcher Agent"]
+        A["Analyst Agent"]
+        V["Architecture Reviewer"]
+        R -->|"tools, papers, benchmarks"| A
+        A -->|"workflow design"| V
+        V -->|"score below 7: feedback"| A
     end
 
-    subgraph Tools["Direct API Tools"]
-        T1[Tavily Web Search]
-        T2[PubMed E-utilities]
-        T3[Code Execution]
-    end
-
-    R -.->|search| T1
-    R -.->|literature| T2
-    V -.->|fact-check| T1
-
-    HRC{Human Review Checkpoint}
+    HRC{"Human Review Checkpoint"}
+    V -->|"score 7 or higher: pass"| HRC
 
     subgraph Phase2["Phase 2: Coding Module"]
-        C[Coder Agent]
-        CR[Code Reviewer]
-
-        C -->|implementation| CR
-        CR -->|score < 7: fix instructions| C
-        CR -->|score >= 7: PASS| OUT
+        C["Coder Agent"]
+        CR["Code Reviewer"]
+        C -->|"implementation"| CR
+        CR -->|"score below 7: fix instructions"| C
     end
 
-    C -.->|syntax test| T3
-    CR -.->|validation| T3
+    OUT["Output: umi_abundance.py + Snakemake rules"]
+    HRC -->|"approved"| C
+    CR -->|"score 7 or higher: pass"| OUT
 
-    HRC -->|approved| Phase2
+    subgraph Tools["Direct API Tools"]
+        T1["Tavily Web Search"]
+        T2["PubMed E-utilities"]
+        T3["Code Execution"]
+    end
+    R -.->|"search"| T1
+    R -.->|"literature"| T2
+    V -.->|"fact-check"| T1
+    C -.->|"syntax test"| T3
+    CR -.->|"validation"| T3
 
     subgraph Config["Configuration"]
-        CFG[config/agents.yaml]
-        ENV[.env API keys]
-        CFG -.-> Phase1
-        CFG -.-> Phase2
-        ENV -.-> Tools
+        CFG["config/agents.yaml"]
+        ENV[".env API keys"]
     end
+    CFG -.-> R
+    CFG -.-> C
+    ENV -.-> T1
 
-    subgraph LLM["LLM Providers (configurable per agent)"]
-        G[Grok / xAI]
-        DS[DeepSeek]
-        OA[OpenAI]
-        GM[Google Gemini]
+    subgraph LLM["LLM Providers"]
+        G["Grok / xAI"]
+        DS["DeepSeek"]
+        OA["OpenAI"]
+        GM["Google Gemini"]
     end
-
-    Phase1 -.-> LLM
-    Phase2 -.-> LLM
-
-    OUT[Output: umi_abundance.py + Snakemake rules]
+    G -.-> R
+    DS -.-> A
+    OA -.-> C
+    GM -.-> CR
 
     subgraph Existing["Existing Pipeline"]
-        SMK[rna_16s.smk]
-        AR[align_ref.py]
-        R16[rna_16s.py]
+        SMK["rna_16s.smk"]
+        AR["align_ref.py"]
+        R16["rna_16s.py"]
     end
-
-    OUT -->|integrates with| Existing
+    OUT -->|"integrates with"| SMK
 ```
 
 The system operates in two phases with a human review checkpoint:
